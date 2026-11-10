@@ -25,3 +25,6 @@ Returns: `checked`, `matching`, `returned`, and a list of jobs with `title`, `co
 ## Limits
 
 The workflow checks only one page of recent posts and uses keyword matching, not machine learning. Job availability and API content can change. The data provider is [Arbeitnow](https://www.arbeitnow.com/).
+## Workflow Preview
+
+![Job Radar Workflow](workflow.png)
