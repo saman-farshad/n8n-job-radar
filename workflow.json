@@ -1,0 +1,136 @@
+{
+  "name": "Job Radar - Python and Data Roles",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "job-radar",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "2a04b76b-0e4c-552f-ab1d-ee43ba5efaba",
+      "name": "Job Radar Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "131c45fe-1c6a-5959-997c-0af4c7af3769"
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\nconst city = String(query.city || 'all').trim();\nconst limit = Math.min(Math.max(Number(query.limit) || 10, 1), 30);\n\nreturn [{json: {\n  city: city,\n  limit: limit,\n  skills: ['python', 'fastapi', 'backend', 'data scientist', 'data analyst', 'machine learning', 'ai engineer', 'ki entwickler', 'automation']\n}}];\n",
+        "mode": "runOnceForAllItems"
+      },
+      "id": "6f3070dd-fb96-596a-9b21-c8bb02a6463e",
+      "name": "Search Settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.arbeitnow.com/api/job-board-api",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "4408ab49-9fb5-55cb-b837-b82c16d8437d",
+      "name": "Get Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const settings = $('Search Settings').first().json;\nconst response = $input.first().json;\nconst jobs = Array.isArray(response.data) ? response.data : [];\nconst city = settings.city.toLowerCase();\nconst seen = new Set();\nconst matches = [];\n\nfunction text(value) {\n  return String(value || '').toLowerCase();\n}\n\nfor (const job of jobs) {\n  const title = text(job.title);\n  const location = text(job.location);\n  const tags = Array.isArray(job.tags) ? job.tags.join(' ').toLowerCase() : '';\n  const description = text(job.description).replace(/<[^>]*>/g, ' ');\n  const url = String(job.url || '');\n  if (!url || seen.has(url)) continue;\n  seen.add(url);\n\n  const title_match = settings.skills.some(skill => title.includes(skill));\n  if (!title_match) continue;\n\n  const remote = Boolean(job.remote) || location.includes('remote');\n  if (city !== 'all' && city !== 'remote') {\n    if (!location.includes(city) && !remote) continue;\n  }\n  if (city === 'remote' && !remote) continue;\n\n  let score = 0;\n  if (/python|fastapi/.test(title)) score += 7;\n  if (/backend|data scientist|data analyst|machine learning/.test(title)) score += 5;\n  if (/ai engineer|ki entwickler|automation/.test(title)) score += 4;\n  if (/junior|trainee|praktik|intern|entry.level|berufseinsteiger/.test(title)) score += 4;\n  if (/fastapi|python|sql|postgresql/.test(description + ' ' + tags)) score += 2;\n  if (/senior|lead|principal|staff|head of/.test(title)) score -= 8;\n  if (score <= 0) continue;\n\n  matches.push({\n    title: job.title || '',\n    company: job.company_name || '',\n    location: job.location || '',\n    remote: remote,\n    score: score,\n    link: url,\n    published_at: job.created_at ? new Date(job.created_at * 1000).toISOString().slice(0, 10) : null\n  });\n}\n\nmatches.sort((a, b) => b.score - a.score);\nreturn [{json: {\n  project: 'job_radar',\n  city: settings.city,\n  checked: jobs.length,\n  matching: matches.length,\n  returned: Math.min(matches.length, settings.limit),\n  jobs: matches.slice(0, settings.limit),\n  data_source: 'Arbeitnow',\n  note: 'Only the latest API page is checked. Scores are rule-based.'\n}}];\n",
+        "mode": "runOnceForAllItems"
+      },
+      "id": "1c5f8dc5-fab3-57ef-a384-c564ae9759ab",
+      "name": "Score And Filter Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "33f3105a-c5b1-5f3c-b920-e42d3927bb7a",
+      "name": "Return Job List",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1160,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Job Radar Webhook": {
+      "main": [
+        [
+          {
+            "node": "Search Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Settings": {
+      "main": [
+        [
+          {
+            "node": "Get Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Jobs": {
+      "main": [
+        [
+          {
+            "node": "Score And Filter Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score And Filter Jobs": {
+      "main": [
+        [
+          {
+            "node": "Return Job List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Berlin"
+  },
+  "pinData": {},
+  "active": false,
+  "tags": []
+}
